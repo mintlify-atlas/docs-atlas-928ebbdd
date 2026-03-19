@@ -1,0 +1,106 @@
+{
+  "projectType": "frontend",
+  "projectName": "Daily Focus",
+  "projectDescription": "A local-first daily task manager built with React, TypeScript, Dexie (IndexedDB), and TanStack Query for centralized caching and automatic UI synchronization.",
+  "theme": "almond",
+  "primaryColor": "#0891b2",
+  "lightColor": "#cffafe",
+  "darkColor": "#164e63",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/overview",
+              "architecture/data-flow",
+              "architecture/local-first"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/tanstack-query",
+              "concepts/dexie-indexeddb",
+              "concepts/task-model"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/task-management",
+              "features/filtering",
+              "features/dashboard"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/scripts",
+              "development/scaling"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Query Hooks",
+            "pages": [
+              "api/use-tasks",
+              "api/use-task",
+              "api/use-add-task",
+              "api/use-update-task",
+              "api/use-delete-task"
+            ]
+          },
+          {
+            "group": "Service Layer",
+            "pages": [
+              "api/task-service"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": [
+              "api/task-type"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Local-first persistence with IndexedDB via Dexie — no backend required",
+    "TanStack Query as the data orchestration layer with centralized caching",
+    "Automatic UI synchronization through query invalidation on mutations",
+    "Add tasks with title and optional description",
+    "Toggle task completion with instant UI feedback",
+    "Delete tasks with optimistic cache invalidation",
+    "Filter tasks by all / completed / pending",
+    "Dashboard counters showing total, completed, and pending task counts",
+    "Layered architecture enabling easy migration from local DB to remote API",
+    "Built with React 19, TypeScript, Vite, Tailwind CSS, and Radix UI primitives"
+  ],
+  "publicApiSurface": [
+    "useTasks() — query hook returning all tasks",
+    "useTask(id: number) — query hook returning a single task by ID",
+    "useAddTask() — mutation hook to add a new task",
+    "useUpdateTask() — mutation hook to update task fields (e.g. toggle completion)",
+    "useDeleteTask() — mutation hook to delete a task by ID",
+    "taskService.getAllTasks() — returns all Task records from IndexedDB",
+    "taskService.getTaskById(id) — returns a single Task by ID",
+    "taskService.addTask(task) — inserts a new Task and returns its generated ID",
+    "taskService.updateTask(id, updates) — partially updates a Task",
+    "taskService.deleteTask(id) — removes a Task from IndexedDB",
+    "Task interface — { id?, title, description?, completed, createdAt, category? }"
+  ]
+}
