@@ -41,11 +41,11 @@ The `Task` interface in `src/types/task.ts` is the source of truth for the shape
     export interface Task {
       id?: number
       title: string
-      description: string
+      description?: string
       completed: boolean
-      createdAt: string
-      category: string
-      priority: 'high' | 'medium' | 'low' // new field
+      createdAt: number
+      category?: string
+      priority?: 'high' | 'medium' | 'low' // new field
     }
     ```
   </Step>
