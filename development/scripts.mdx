@@ -1,0 +1,82 @@
+---
+title: 'Scripts'
+description: 'Reference for all npm scripts available in Daily Focus.'
+---
+
+All scripts are defined in `package.json` and run via `npm run <script>`.
+
+<Note>
+  This project uses `rolldown-vite` — a rolldown-based Vite build — aliased as `vite` in `package.json`. If you see `vite` in any script command, it resolves to `rolldown-vite@7.2.2` via the package alias.
+</Note>
+
+## Script reference
+
+| Script | Command | When to use |
+|---|---|---|
+| `dev` | `vite --host` | Active development |
+| `build` | `tsc -b && vite build` | Preparing a production build |
+| `preview` | `vite preview` | Verifying production behavior before deploying |
+| `lint` | `eslint .` | Checking code quality, before committing |
+
+---
+
+### `npm run dev`
+
+```bash
+vite --host
+```
+
+Starts the Vite development server with Hot Module Replacement (HMR) enabled. Changes to source files are reflected in the browser instantly without a full page reload.
+
+The `--host` flag binds the server to `0.0.0.0` (all network interfaces) rather than only `localhost`. This makes the app reachable from other devices on the same network and from inside Docker containers or dev environments.
+
+- **Default port:** 5173
+- **Use when:** actively developing the app
+
+---
+
+### `npm run build`
+
+```bash
+tsc -b && vite build
+```
+
+Runs two steps in sequence:
+
+1. **`tsc -b`** — TypeScript type checking. If there are any type errors, the process exits here and the Vite build never runs.
+2. **`vite build`** — Bundles and optimizes the app for production.
+
+Output is written to the `dist/` directory.
+
+- **Use when:** preparing a release or deploying the app
+
+---
+
+### `npm run preview`
+
+```bash
+vite preview
+```
+
+Serves the contents of `dist/` over a local HTTP server so you can test the production build before deploying it.
+
+<Note>
+  You must run `npm run build` before `npm run preview`. The preview server serves whatever is currently in `dist/` — it does not build the project.
+</Note>
+
+- **Use when:** verifying that the production build behaves correctly before deployment
+
+---
+
+### `npm run lint`
+
+```bash
+eslint .
+```
+
+Runs ESLint across the entire project. The ESLint configuration includes:
+
+- **`eslint-plugin-react-hooks`** — enforces the [Rules of Hooks](https://react.dev/reference/rules/rules-of-hooks)
+- **`eslint-plugin-react-refresh`** — warns about exports that are incompatible with HMR
+
+- **Use when:** checking code quality, or as part of a pre-commit check

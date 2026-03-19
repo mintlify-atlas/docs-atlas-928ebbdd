@@ -1,0 +1,79 @@
+---
+title: Architecture overview
+description: A layered breakdown of how Daily Focus is structured, from UI components down to IndexedDB persistence.
+---
+
+Daily Focus is organized into five discrete layers. Each layer has a single responsibility and communicates only with the layer directly below it. This separation keeps the codebase predictable and makes individual layers easy to replace or test in isolation.
+
+## Layers
+
+| Layer | Location | Role | Key exports |
+|---|---|---|---|
+| **UI** | `src/components/`, `src/pages/` | Renders views, handles user interactions, consumes query hooks | `Layout`, `TaskItem`, `HomePage` |
+| **Query** | `src/queries/task.queries.ts` | TanStack Query hooks that encapsulate all reads and writes | `useTasks`, `useTask`, `useAddTask`, `useUpdateTask`, `useDeleteTask` |
+| **Service** | `src/services/taskService.ts` | `TaskService` class with typed async methods; the single point of contact between queries and persistence | `taskService` |
+| **Persistence** | `src/data/db.ts` | `DailyFocusDB` extending Dexie; defines the IndexedDB schema and exposes typed tables | `db` |
+| **Domain** | `src/types/task.ts` | `Task` interface shared across every other layer | `Task` |
+
+## How the layers connect
+
+A typical read or write travels through the stack in one direction:
+
+```text
+UI  →  Query hooks  →  TaskService  →  DailyFocusDB (Dexie)  →  IndexedDB
+```
+
+The domain types (`Task`) flow across all layers as a shared contract, ensuring TypeScript catches mismatches at compile time rather than at runtime.
+
+### UI layer
+
+Components in `src/components/` and pages in `src/pages/` are pure React. They call query hooks to read data and trigger mutations — they never import `taskService` or `db` directly.
+
+### Query layer
+
+`task.queries.ts` wraps every operation in a `useQuery` or `useMutation` hook from TanStack Query. This gives the UI automatic loading/error states and a shared cache without any manual state management.
+
+### Service layer
+
+`TaskService` provides a clean, typed API (`getAllTasks`, `addTask`, `updateTask`, `deleteTask`, `getTaskById`). Query hooks call these methods without knowing anything about Dexie or IndexedDB.
+
+### Persistence layer
+
+`DailyFocusDB` extends `Dexie` and declares the IndexedDB schema:
+
+```ts src/data/db.ts
+import type { Task } from '@/types/task'
+import Dexie, { type Table } from 'dexie'
+
+class DailyFocusDB extends Dexie {
+    tasks!: Table<Task, number>
+
+    constructor() {
+        super('DailyFocusDB')
+        this.version(1).stores({
+            tasks: '++id, title, description, completed, createdAt, category',
+        })
+    }
+}
+
+export const db = new DailyFocusDB()
+```
+
+### Domain layer
+
+The `Task` interface is defined once in `src/types/task.ts` and imported by every other layer. It is the single source of truth for what a task looks like.
+
+<Tip>
+  Because the service layer is the only place that references Dexie, swapping IndexedDB for a REST API requires changing only `taskService.ts`. All query hooks, components, and types remain untouched.
+</Tip>
+
+## Explore further
+
+<CardGroup cols={2}>
+  <Card title="Data flow" icon="arrow-right" href="/architecture/data-flow">
+    Step-by-step walkthrough of how adding, toggling, and deleting a task moves through the stack.
+  </Card>
+  <Card title="Local-first design" icon="database" href="/architecture/local-first">
+    How Daily Focus stores all data in the browser and works fully offline.
+  </Card>
+</CardGroup>

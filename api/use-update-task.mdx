@@ -1,0 +1,92 @@
+---
+title: useUpdateTask
+description: Mutation hook to partially update an existing task in IndexedDB and invalidate related caches.
+---
+
+`useUpdateTask` is a mutation hook that applies a partial update to an existing task in the local IndexedDB database. On success it invalidates both the `['tasks']` list cache and the `['task', id]` per-item cache.
+
+## Signature
+
+```typescript queries/task.queries.ts
+export const useUpdateTask = () =>
+  UseMutationResult<number, Error, { id: number; updates: Partial<Omit<Task, 'id'>> }>
+```
+
+## Parameters
+
+`useUpdateTask` itself takes no parameters. The update payload is passed to the returned `mutate` function at call time.
+
+## Mutation input
+
+Pass a single object to `mutate()` with the following shape:
+
+<ParamField path="id" type="number" required>
+  The primary key of the task to update.
+</ParamField>
+
+<ParamField path="updates" type="Partial<Omit<Task, 'id'>>" required>
+  A partial object containing only the fields you want to change. Any field from the [`Task`](/api/task-type) interface except `id` is accepted.
+
+  <Expandable title="Updatable fields">
+    <ResponseField name="title" type="string">New task label.</ResponseField>
+    <ResponseField name="description" type="string">New detail text.</ResponseField>
+    <ResponseField name="completed" type="boolean">New completion state.</ResponseField>
+    <ResponseField name="createdAt" type="number">New creation timestamp.</ResponseField>
+    <ResponseField name="category" type="string">New category label.</ResponseField>
+  </Expandable>
+</ParamField>
+
+## Returns
+
+A TanStack Query `UseMutationResult` object.
+
+<ResponseField name="mutate" type="(payload: { id: number; updates: Partial<Omit<Task, 'id'>> }) => void">
+  Trigger the mutation. The resolved value is `1` if the record was found and updated, or `0` if no record with the given `id` exists.
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the mutation is in flight. Use this to disable interactive controls.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` after the mutation completed successfully.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the mutation threw an error.
+</ResponseField>
+
+## Cache behavior
+
+On success, `useUpdateTask` invalidates:
+
+- `['tasks']` — causes `useTasks` to re-fetch the full list
+- `['task', id]` — causes `useTask(id)` to re-fetch the updated record
+
+## Usage
+
+```tsx TaskItem.tsx
+import { useUpdateTask } from '@/queries/task.queries';
+
+export function TaskItem({ task }: { task: Task }) {
+  const updateTask = useUpdateTask();
+
+  return (
+    <button
+      onClick={() =>
+        updateTask.mutate({
+          id: task.id!,
+          updates: { completed: !task.completed },
+        })
+      }
+      disabled={updateTask.isPending}
+    >
+      {task.completed ? 'Mark incomplete' : 'Mark complete'}
+    </button>
+  );
+}
+```
+
+<Note>
+  Only include the fields you want to change in `updates`. Dexie's `update` method performs a shallow merge, leaving all other fields on the stored record untouched.
+</Note>

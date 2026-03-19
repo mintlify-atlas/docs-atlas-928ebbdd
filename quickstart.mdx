@@ -1,80 +1,63 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get Daily Focus running locally in under two minutes.'
 ---
 
-## Get started in three steps
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/R0N7w7/DailyFocus_LocalFirst.git && cd DailyFocus_LocalFirst
+    ```
+  </Step>
 
-Get your documentation site running locally and make your first customization.
+  <Step title="Install dependencies">
+    Requires **Node.js 18+** and **npm**.
 
-### Step 1: Set up your local environment
+    ```bash
+    npm install
+    ```
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Start the dev server">
+    ```bash
+    npm run dev
+    ```
 
-### Step 2: Deploy your changes
+    Vite starts the app at [http://localhost:5173](http://localhost:5173). The `--host` flag is included in the script, so the server also binds to `0.0.0.0` — making it reachable from other devices on your local network.
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+  <Step title="Open the app">
+    Navigate to [http://localhost:5173](http://localhost:5173) in your browser. The app loads immediately with no login screen.
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Add your first task">
+    On the main screen you will see a task input form:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    1. Enter a title in the **title** field (required).
+    2. Optionally fill in the **description** field for more detail.
+    3. Click **Añadir tarea** to save the task.
 
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+    The task appears immediately in the list below the form.
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  All data is stored locally in your browser's IndexedDB — no account or sign-up required.
 </Note>
+
+## What happens under the hood
+
+When the app boots, `main.tsx` renders a `<QueryClientProvider>` that wraps the entire component tree, providing a shared TanStack Query cache to every component in the app.
+
+When you click **Añadir tarea**, the form calls the `useAddTask()` hook. That hook runs a mutation that calls `taskService.addTask()`, which writes the new `Task` record to the local [Dexie](https://dexie.org/) database — a thin wrapper around the browser's **IndexedDB**. Once the write succeeds, the mutation invalidates the `['tasks']` query key, causing TanStack Query to re-fetch the task list and re-render the UI with the updated data.
+
+No network request is made at any point. Every read and write goes through Dexie → IndexedDB, staying entirely on-device.
+
+<Columns cols={2}>
+  <Card title="Architecture overview" icon="sitemap" href="/architecture/overview">
+    How the layers — routing, query cache, service layer, and Dexie — fit together.
+  </Card>
+  <Card title="TanStack Query concepts" icon="database" href="/concepts/tanstack-query">
+    Query keys, mutations, cache invalidation, and how Daily Focus uses them.
+  </Card>
+</Columns>

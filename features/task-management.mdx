@@ -1,0 +1,137 @@
+---
+title: "Task management"
+description: "How to add, complete, and delete tasks in Daily Focus."
+---
+
+Daily Focus exposes three core task operations: adding, toggling completion, and deleting. All mutations go through TanStack Query, which handles cache invalidation and keeps the UI in sync automatically.
+
+## Adding a task
+
+<Steps>
+  <Step title="Fill in the form">
+    The form at the top of the page contains a required **Title** field and an optional **Description** field.
+
+    ```tsx HomePage.tsx
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
+    ```
+
+    The **Add task** button is disabled when the title is empty or while the mutation is in flight (`addTask.isPending`).
+  </Step>
+
+  <Step title="Submit">
+    On submit, `handleAddTask` validates that the title is non-empty, constructs the new task object, and fires the mutation:
+
+    ```tsx HomePage.tsx
+    const handleAddTask = (event?: FormEvent<HTMLFormElement>) => {
+        event?.preventDefault();
+        if (!title.trim()) return;
+
+        const newTask: Omit<Task, "id"> = {
+            title: title.trim(),
+            description: description.trim(),
+            completed: false,
+            createdAt: Date.now(),
+        };
+
+        addTask.mutate(newTask);
+        setTitle("");
+        setDescription("");
+    };
+    ```
+
+    `id` is omitted — the database assigns it. `createdAt` is set to the current Unix timestamp so the task appears at the top of the newest-first list.
+  </Step>
+
+  <Step title="Cache refresh">
+    On success, `useAddTask` invalidates the `['tasks']` query key:
+
+    ```ts task.queries.ts
+    export const useAddTask = () => {
+        const queryClient = useQueryClient();
+        return useMutation({
+            mutationFn: (newTask: Omit<Task, 'id'>) => taskService.addTask(newTask),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            },
+        });
+    }
+    ```
+
+    The form fields are cleared and the task list re-fetches automatically.
+  </Step>
+</Steps>
+
+## Toggling completion
+
+Each `TaskItem` renders a circular toggle button. The icon reflects the current state:
+
+- `<Circle />` — task is pending
+- `<CheckCircle2 />` — task is completed
+
+Clicking the button calls `updateTask.mutate` with the flipped `completed` value:
+
+```tsx TaskItem.tsx
+const handleToggle = (id: number) => {
+    updateTask.mutate({ id, updates: { completed: !task.completed } });
+};
+```
+
+The card styling updates immediately to reflect the new state:
+
+```tsx TaskItem.tsx
+<Card className={cn(
+    "group border transition-all duration-200",
+    "border-slate-200/80 bg-white/90 hover:-translate-y-0.5 hover:shadow-md",
+    task.completed && "border-emerald-200 bg-emerald-50/60"
+)}>
+```
+
+The title receives a `line-through` style and the badge switches between **Completada** (success variant) and **Pendiente** (warning variant).
+
+On success, both `['tasks']` and `['task', id]` query keys are invalidated so all views stay consistent:
+
+```ts task.queries.ts
+export const useUpdateTask = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, updates }: { id: number; updates: Partial<Omit<Task, 'id'>> }) =>
+            taskService.updateTask(id, updates),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task', id] })
+        }
+    })
+}
+```
+
+## Deleting a task
+
+Each `TaskItem` renders a delete button with a `Trash2` icon that turns red on hover.
+
+<Warning>
+  Deletion is immediate — there is no confirmation dialog. Once you click the delete button, the task is permanently removed.
+</Warning>
+
+```tsx TaskItem.tsx
+const handleDelete = (id: number) => {
+    deleteTask.mutate(id);
+};
+```
+
+The button is disabled while `deleteTask.isPending` to prevent double-clicks. On success, both `['tasks']` and `['task', id]` are invalidated:
+
+```ts task.queries.ts
+export const useDeleteTask = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (id: number) => taskService.deleteTask(id),
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task', id] })
+        }
+    })
+}
+```
+
+The task disappears from the list and the dashboard counters update automatically.

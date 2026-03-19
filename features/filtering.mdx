@@ -1,0 +1,58 @@
+---
+title: "Filtering"
+description: "Filter tasks by status using the Todas, Completadas, and Pendientes tabs."
+---
+
+The task list provides three filter tabs that let you focus on a specific subset of your tasks without leaving the page.
+
+## Filter tabs
+
+The tabs are rendered below the dashboard cards using Shadcn's `<Tabs>` component:
+
+| Tab | Value | Shows |
+|-----|-------|-------|
+| **Todas** | `"all"` | Every task |
+| **Completadas** | `"completed"` | Only completed tasks |
+| **Pendientes** | `"pending"` | Only pending tasks |
+
+Filter state is a simple `useState` hook initialized to `"all"`:
+
+```tsx HomePage.tsx
+const [filter, setFilter] = useState<"all" | "completed" | "pending">("all");
+```
+
+## How filtering works
+
+Filtering is applied client-side to the tasks already loaded in the TanStack Query cache:
+
+```tsx HomePage.tsx
+const filteredTasks = tasks
+    .filter((task) => {
+        if (filter === "completed") return task.completed;
+        if (filter === "pending") return !task.completed;
+        return true;
+    })
+    .sort((a, b) => b.createdAt - a.createdAt);
+```
+
+The `.filter()` pass selects matching tasks, then `.sort()` orders them newest-first before they are rendered.
+
+<Tip>
+  Because filtering runs against data already in memory, switching between tabs is instant — no database query or network request is triggered.
+</Tip>
+
+<Note>
+  Tasks are always sorted newest-first by their `createdAt` timestamp, which is set to `Date.now()` at creation time. This order is preserved regardless of which filter tab is active.
+</Note>
+
+## Empty states
+
+When a filter returns no tasks, the list area shows a context-aware empty state message:
+
+| Active filter | Message |
+|---------------|---------|
+| **Todas** | *No tienes tareas aun. Empieza agregando tu primer objetivo.* |
+| **Completadas** | *Todavia no completaste tareas.* |
+| **Pendientes** | *Nada pendiente. Gran trabajo por hoy.* |
+
+These messages guide you toward the next logical action based on your current view.

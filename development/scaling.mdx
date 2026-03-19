@@ -1,0 +1,116 @@
+---
+title: 'Scaling'
+description: 'Extend and scale Daily Focus — migrate to a remote API, add fields, add routes, and debug the query cache.'
+---
+
+The layered architecture of Daily Focus is designed to make common growth scenarios straightforward. Each layer has a single responsibility, which limits the blast radius of any change.
+
+## Migrating from IndexedDB to a remote API
+
+All data access is funneled through `src/services/taskService.ts`. The query hooks, query keys, mutation patterns, and all component code sit above this layer and are unaware of how data is fetched.
+
+To migrate to a backend API, you only replace the service method bodies. Everything above the service layer remains unchanged.
+
+```ts taskService.ts
+// Before (Dexie)
+async getAllTasks(): Promise<Task[]> {
+    return db.tasks.toArray() // [!code --]
+    return fetch('/api/tasks').then(r => r.json()) // [!code ++]
+}
+
+async addTask(task: Omit<Task, 'id'>): Promise<number> {
+    return db.tasks.add(task) // [!code --]
+    return fetch('/api/tasks', { method: 'POST', body: JSON.stringify(task) }) // [!code ++]
+        .then(r => r.json()).then(data => data.id) // [!code ++]
+}
+```
+
+The query hooks in `src/queries/task.queries.ts`, all query keys, and every component that calls those hooks continue to work without modification.
+
+---
+
+## Adding a new task field
+
+The `Task` interface in `src/types/task.ts` is the source of truth for the shape of a task. Adding a field requires changes in three places:
+
+<Steps>
+  <Step title="Add the field to the Task interface">
+    Open `src/types/task.ts` and add your new field:
+
+    ```ts types/task.ts
+    export interface Task {
+      id?: number
+      title: string
+      description: string
+      completed: boolean
+      createdAt: string
+      category: string
+      priority: 'high' | 'medium' | 'low' // new field
+    }
+    ```
+  </Step>
+
+  <Step title="Increment the Dexie schema version">
+    Open `src/data/db.ts` and bump the version number. Add the new field to the index list if you want to query by it:
+
+    ```ts data/db.ts
+    this.version(2).stores({
+        tasks: '++id, title, description, completed, createdAt, category, priority',
+    })
+    ```
+
+    <Warning>
+      Bumping the schema version without a migration strategy will throw an error for any user who already has data stored under version 1. Dexie requires you to define upgrade logic when changing the schema for existing databases. See the [Dexie migration docs](https://dexie.org/docs/Tutorial/Design#database-versioning) for guidance on writing safe upgrades.
+    </Warning>
+  </Step>
+
+  <Step title="Update forms and components">
+    Update any component that creates or displays tasks — such as the task creation form in `src/pages/HomePage.tsx` and `src/components/TaskItem.tsx` — to read and write the new field.
+  </Step>
+</Steps>
+
+---
+
+## Adding more pages and routes
+
+Routes are defined in `src/routes/AppRoutes.tsx` as a `RouteObject[]` array. To add a new page, create a page component and add a child route:
+
+```tsx AppRoutes.tsx
+const AppRoutes: RouteObject[] = [
+    {
+        path: '/',
+        element: <Layout />,
+        children: [
+            { index: true, element: <HomePage /> },
+            { path: 'history', element: <HistoryPage /> }, // new page
+        ],
+    },
+];
+```
+
+Place the new page component in `src/pages/` to keep it consistent with the existing structure.
+
+---
+
+## Adding React Query DevTools
+
+During development, TanStack Query's DevTools panel lets you inspect the query cache, see which queries are active, and trigger refetches manually.
+
+<Tip>
+  Install the DevTools as a dev dependency:
+
+  ```bash
+  npm install -D @tanstack/react-query-devtools
+  ```
+</Tip>
+
+Then add it inside your `QueryClientProvider` in `main.tsx`:
+
+```tsx main.tsx
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+
+// Inside your component tree, as a child of QueryClientProvider:
+<ReactQueryDevtools initialIsOpen={false} />
+```
+
+The panel appears as an overlay in the browser. Set `initialIsOpen={false}` so it starts collapsed. It is automatically excluded from production builds when using `import.meta.env.DEV` guards, or you can limit the import to dev-only entry points.

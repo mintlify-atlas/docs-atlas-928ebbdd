@@ -1,0 +1,170 @@
+---
+title: TanStack Query
+description: How Daily Focus uses TanStack Query as its data orchestration layer to manage caching, loading states, and cache invalidation.
+---
+
+Daily Focus uses [TanStack Query](https://tanstack.com/query) (formerly React Query) to manage all async data fetching and mutations. Even though there is no remote API — all reads and writes go to IndexedDB via Dexie — TanStack Query provides a centralized cache, consistent loading/pending states, and automatic re-fetching when data changes.
+
+## Why TanStack Query over plain state
+
+A typical local app might reach for `useState` or `useReducer` to hold task data. TanStack Query gives you several things plain state does not:
+
+- **Centralized cache** — any component can read `['tasks']` from the cache without prop drilling.
+- **Automatic invalidation** — after a mutation, calling `invalidateQueries` marks the cache stale and schedules a background refetch; all subscribers update automatically.
+- **Consistent loading and pending states** — `isLoading`, `isPending`, and `isError` are derived from the same query lifecycle, not hand-rolled booleans.
+- **Deduplication** — multiple components requesting the same query key share a single in-flight request.
+
+<Info>
+  This architecture makes migrating to a remote API straightforward — only the `queryFn` inside each hook needs to change. The components and invalidation logic stay the same.
+</Info>
+
+## QueryClient setup
+
+A single `QueryClient` instance is created at the app root and provided to the entire tree via `QueryClientProvider`.
+
+```tsx main.tsx
+const queryClient = new QueryClient();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
+    </QueryClientProvider>
+  </React.StrictMode>,
+);
+```
+
+All hooks that call `useQueryClient()` inside them receive this same instance.
+
+## Query keys
+
+TanStack Query identifies cached data by a serializable array called a **query key**. Daily Focus uses two:
+
+| Key | Used by | Describes |
+|---|---|---|
+| `['tasks']` | `useTasks()` | The full list of all tasks |
+| `['task', id]` | `useTask(id)` | A single task identified by its numeric ID |
+
+When a mutation invalidates `['tasks']`, only the list query is refetched. When it invalidates `['task', id]`, only the query for that specific record is refetched.
+
+## Queries
+
+Queries are read operations. They run automatically when the component mounts and whenever their key becomes stale.
+
+### `useTasks` — fetch all tasks
+
+```ts queries/task.queries.ts
+export const useTasks = () => {
+    return useQuery({
+        queryKey: ['tasks'],
+        queryFn: () => taskService.getAllTasks(),
+    });
+}
+```
+
+**Used in `HomePage`:**
+
+```tsx
+const tasksQuery = useTasks();
+const tasks = tasksQuery.data ?? [];
+```
+
+### `useTask` — fetch one task by ID
+
+```ts queries/task.queries.ts
+export const useTask = (id: number) => {
+    return useQuery({
+        queryKey: ['task', id],
+        queryFn: () => taskService.getTaskById(id),
+    });
+}
+```
+
+Both hooks return the standard TanStack Query result object. The most commonly used fields are:
+
+| Field | Type | Description |
+|---|---|---|
+| `data` | `Task[]` \| `Task` \| `undefined` | The fetched value, or `undefined` while loading |
+| `isLoading` | `boolean` | `true` on the initial fetch before any data is available |
+| `isError` | `boolean` | `true` if the `queryFn` threw |
+| `error` | `Error` \| `null` | The thrown error, if any |
+| `refetch` | `function` | Manually trigger a refetch |
+
+## Mutations and invalidation
+
+Mutations are write operations. After a successful write, `onSuccess` calls `queryClient.invalidateQueries()` to mark the relevant cached queries as stale. TanStack Query then refetches them in the background, and all subscribed components re-render with the new data.
+
+### `useAddTask` — insert a new task
+
+```ts queries/task.queries.ts
+export const useAddTask = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (newTask: Omit<Task, 'id'>) => taskService.addTask(newTask),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        },
+    });
+}
+```
+
+Adding a task only invalidates `['tasks']` — the list — because there is no pre-existing single-task cache entry to refresh.
+
+**Used in `HomePage`:**
+
+```tsx
+const addTask = useAddTask();
+addTask.mutate(newTask);
+```
+
+### `useUpdateTask` and `useDeleteTask` — modify an existing task
+
+```ts queries/task.queries.ts
+export const useUpdateTask = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: ({ id, updates }: { id: number; updates: Partial<Omit<Task, 'id'>> }) =>
+            taskService.updateTask(id, updates),
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task', id] })
+        }
+    })
+}
+
+export const useDeleteTask = () => {
+    const queryClient = useQueryClient()
+    return useMutation({
+        mutationFn: (id: number) => taskService.deleteTask(id),
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['task', id] })
+        }
+    })
+}
+```
+
+Both invalidate `['tasks']` and `['task', id]` because the list and the individual record are both affected.
+
+**Used in `TaskItem`:**
+
+```tsx
+const updateTask = useUpdateTask();
+const deleteTask = useDeleteTask();
+
+updateTask.mutate({ id, updates: { completed: !task.completed } });
+deleteTask.mutate(id);
+```
+
+## Loading and pending states
+
+TanStack Query exposes lifecycle flags on both query and mutation results.
+
+| Flag | Source | Meaning |
+|---|---|---|
+| `tasksQuery.isLoading` | `useQuery` result | Initial load in progress, no data yet |
+| `addTask.isPending` | `useMutation` result | Mutation is in flight |
+
+These flags are used in the UI to show loading indicators and disable form controls while an operation is in progress.

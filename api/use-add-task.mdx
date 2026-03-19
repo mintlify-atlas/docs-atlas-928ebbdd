@@ -1,0 +1,92 @@
+---
+title: useAddTask
+description: Mutation hook to insert a new task into IndexedDB and invalidate the task list cache.
+---
+
+`useAddTask` is a mutation hook that writes a new task to the local IndexedDB database. On success it invalidates the `['tasks']` query so the list re-fetches automatically.
+
+## Signature
+
+```typescript queries/task.queries.ts
+export const useAddTask = () => UseMutationResult<number, Error, Omit<Task, 'id'>>
+```
+
+## Parameters
+
+`useAddTask` itself takes no parameters. The task data is passed to the returned `mutate` function at call time.
+
+## Mutation input
+
+Pass an `Omit<Task, 'id'>` object to `mutate()`. All fields from the [`Task`](/api/task-type) interface are accepted except `id`, which is assigned by Dexie automatically.
+
+<ResponseField name="title" type="string" required>
+  The task label shown in the list.
+</ResponseField>
+
+<ResponseField name="completed" type="boolean" required>
+  Whether the task has been marked done. Pass `false` for a newly created task.
+</ResponseField>
+
+<ResponseField name="createdAt" type="number" required>
+  Unix timestamp in milliseconds. Use `Date.now()` at creation time.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Optional additional detail text.
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Optional category label.
+</ResponseField>
+
+## Returns
+
+A TanStack Query `UseMutationResult` object.
+
+<ResponseField name="mutate" type="(newTask: Omit<Task, 'id'>) => void">
+  Trigger the mutation. The resolved value is the auto-generated `id` of the new record (`number`).
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the mutation is in flight. Use this to disable the submit button.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` after the mutation completed successfully.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the mutation threw an error.
+</ResponseField>
+
+## Cache behavior
+
+On success, `useAddTask` invalidates the `['tasks']` query key, causing `useTasks` to re-fetch the updated list from IndexedDB.
+
+## Usage
+
+```tsx HomePage.tsx
+import { useAddTask } from '@/queries/task.queries';
+
+export function HomePage() {
+  const addTask = useAddTask();
+
+  function handleSubmit(title: string) {
+    const newTask = {
+      title,
+      completed: false,
+      createdAt: Date.now(),
+    };
+    addTask.mutate(newTask);
+  }
+
+  return (
+    <button
+      onClick={() => handleSubmit('Buy groceries')}
+      disabled={addTask.isPending}
+    >
+      {addTask.isPending ? 'Adding...' : 'Add task'}
+    </button>
+  );
+}
+```

@@ -1,0 +1,86 @@
+---
+title: Local-first design
+description: How Daily Focus stores all data in the browser's IndexedDB and operates entirely offline with no server or user accounts.
+---
+
+Daily Focus is a local-first application. Every piece of data lives in the browser — there are no network requests for CRUD operations, no authentication flow, no user accounts, and no server to deploy or maintain.
+
+## How it works
+
+**All data lives in IndexedDB.** The `DailyFocusDB` database (backed by Dexie) is created once when the app first loads and persists across page reloads. Tasks are stored as records in an IndexedDB object store scoped to the user's browser profile.
+
+```ts src/data/db.ts
+class DailyFocusDB extends Dexie {
+    tasks!: Table<Task, number>
+
+    constructor() {
+        super('DailyFocusDB')
+        this.version(1).stores({
+            tasks: '++id, title, description, completed, createdAt, category',
+        })
+    }
+}
+
+export const db = new DailyFocusDB()
+```
+
+The string `'DailyFocusDB'` is the IndexedDB database name. You can inspect it directly in the browser's DevTools under **Application → IndexedDB**.
+
+**The app works fully offline.** After the initial page load (which fetches the JavaScript bundle), the app has everything it needs. You can disconnect from the network and all task operations — creating, updating, completing, deleting — continue to work without error.
+
+**Data is scoped to the browser profile.** Tasks created in Chrome are not visible in Firefox, and tasks created in a private/incognito window are isolated from the regular profile. There is no sync mechanism between profiles or devices.
+
+<Warning>
+  Clearing browser storage — for example via **DevTools → Application → Storage → Clear site data**, or using `indexedDB.deleteDatabase('DailyFocusDB')` — will permanently erase all tasks. There is no server-side backup and no way to recover the data.
+</Warning>
+
+## App bootstrap
+
+The entry point in `main.tsx` wraps the entire app in a `QueryClientProvider` and `BrowserRouter`. No network configuration, auth providers, or environment variables are needed:
+
+```tsx src/main.tsx
+const queryClient = new QueryClient();
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppRouter />
+      </BrowserRouter>
+    </QueryClientProvider>
+  </React.StrictMode>,
+);
+```
+
+## Migrating to a remote API
+
+The layered architecture makes adding a backend straightforward. Because `taskService.ts` is the only file that references Dexie, you can swap the persistence mechanism without touching any query hooks, components, or types.
+
+Here is a conceptual diff showing `getAllTasks()` switching from Dexie to a `fetch` call:
+
+```diff src/services/taskService.ts
+  class TaskService {
+      async getAllTasks(): Promise<Task[]> {
+-         return db.tasks.toArray()
++         const response = await fetch('/api/tasks')
++         return response.json()
+      }
+
+      async addTask(task: Omit<Task, 'id'>): Promise<number> {
+-         return db.tasks.add(task)
++         const response = await fetch('/api/tasks', {
++             method: 'POST',
++             headers: { 'Content-Type': 'application/json' },
++             body: JSON.stringify(task),
++         })
++         const created = await response.json()
++         return created.id
+      }
+  }
+```
+
+The rest of the codebase — `task.queries.ts`, all components, and `types/task.ts` — remains unchanged. TanStack Query's cache invalidation strategy works identically whether the underlying source is IndexedDB or a remote API.
+
+<Note>
+  If you add a remote backend, consider also adding optimistic updates in your mutation `onMutate` callbacks. Unlike local IndexedDB operations (which are near-instant), network requests introduce latency where optimistic UI updates improve perceived performance.
+</Note>

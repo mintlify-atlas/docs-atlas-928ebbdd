@@ -1,0 +1,153 @@
+---
+title: Data flow
+description: A detailed walkthrough of how the three main mutations — adding, toggling, and deleting a task — travel through the Daily Focus stack.
+---
+
+Every user action follows the same path through the application:
+
+```text
+HomePage/TaskItem  →  TanStack Query hooks  →  taskService  →  Dexie  →  IndexedDB
+                              ↑
+                    Query cache + invalidation
+```
+
+The sections below trace each of the three main mutations in full detail.
+
+---
+
+## Adding a task
+
+<Steps>
+  <Step title="User submits the form">
+    The user fills in the task form in `HomePage` and submits it. The component calls:
+
+    ```ts
+    addTask.mutate(newTask)
+    ```
+  </Step>
+  <Step title="Mutation calls the service">
+    `useAddTask()` in `task.queries.ts` forwards the payload to the service layer:
+
+    ```ts
+    mutationFn: (newTask: Omit<Task, 'id'>) => taskService.addTask(newTask)
+    ```
+  </Step>
+  <Step title="Service writes to IndexedDB">
+    `taskService.addTask()` calls Dexie, which writes the record to IndexedDB and returns the auto-incremented `id`:
+
+    ```ts
+    async addTask(task: Omit<Task, 'id'>): Promise<number> {
+        return db.tasks.add(task)
+    }
+    ```
+  </Step>
+  <Step title="Cache is invalidated">
+    The `onSuccess` callback tells TanStack Query to invalidate the `['tasks']` query key:
+
+    ```ts
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    }
+    ```
+  </Step>
+  <Step title="UI re-renders with the new task">
+    Invalidation triggers a background refetch of `useTasks()`. When fresh data arrives, React re-renders the task list and the new task appears.
+  </Step>
+</Steps>
+
+---
+
+## Toggling task completion
+
+<Steps>
+  <Step title="User clicks the toggle button">
+    `TaskItem` calls:
+
+    ```ts
+    updateTask.mutate({ id, updates: { completed: !task.completed } })
+    ```
+  </Step>
+  <Step title="Mutation calls the service">
+    `useUpdateTask()` forwards the partial update:
+
+    ```ts
+    mutationFn: ({ id, updates }: { id: number; updates: Partial<Omit<Task, 'id'>> }) =>
+        taskService.updateTask(id, updates)
+    ```
+  </Step>
+  <Step title="Dexie patches the record in IndexedDB">
+    ```ts
+    async updateTask(id: number, updates: Partial<Omit<Task, 'id'>>): Promise<number> {
+        return db.tasks.update(id, updates)
+    }
+    ```
+
+    Dexie only writes the changed fields — the rest of the record is untouched.
+  </Step>
+  <Step title="Both affected query keys are invalidated">
+    `onSuccess` invalidates both the list cache and the individual task cache:
+
+    ```ts
+    onSuccess: (_, { id }) => {
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        queryClient.invalidateQueries({ queryKey: ['task', id] })
+    }
+    ```
+  </Step>
+  <Step title="UI re-renders with updated state">
+    Any component subscribed to `useTasks()` or `useTask(id)` automatically receives the fresh data and re-renders.
+  </Step>
+</Steps>
+
+---
+
+## Deleting a task
+
+<Steps>
+  <Step title="User clicks the delete button">
+    `TaskItem` calls:
+
+    ```ts
+    deleteTask.mutate(id)
+    ```
+  </Step>
+  <Step title="Mutation calls the service">
+    `useDeleteTask()` delegates to the service:
+
+    ```ts
+    mutationFn: (id: number) => taskService.deleteTask(id)
+    ```
+  </Step>
+  <Step title="Dexie removes the record from IndexedDB">
+    ```ts
+    async deleteTask(id: number): Promise<void> {
+        return db.tasks.delete(id)
+    }
+    ```
+  </Step>
+  <Step title="Both affected query keys are invalidated">
+    ```ts
+    onSuccess: (_, id) => {
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        queryClient.invalidateQueries({ queryKey: ['task', id] })
+    }
+    ```
+  </Step>
+  <Step title="UI re-renders without the deleted task">
+    The task list refetches and the deleted item is removed from the UI.
+  </Step>
+</Steps>
+
+---
+
+## Why invalidation instead of manual cache updates
+
+TanStack Query provides a `setQueryData` API that lets you update the cache directly after a mutation, avoiding the refetch entirely. Daily Focus deliberately uses `invalidateQueries` instead for two reasons:
+
+1. **Correctness over speed.** Invalidation always re-fetches from the real source of truth (IndexedDB). Manual cache updates require you to replicate the exact same transformation logic in JavaScript, which can drift from what Dexie actually stored — especially for auto-incremented IDs and timestamps generated at the database level.
+
+2. **Simplicity.** Invalidation is a one-liner. Optimistic updates require rollback logic for failure cases, which adds meaningful complexity for a local-first app where writes are effectively instantaneous and never fail due to network issues.
+
+<Note>
+  Because all reads and writes hit a local IndexedDB database, the round-trip time for a refetch after invalidation is measured in microseconds. The performance trade-off that makes optimistic updates worthwhile in networked apps does not apply here.
+</Note>

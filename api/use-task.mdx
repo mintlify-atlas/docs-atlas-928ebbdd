@@ -1,0 +1,79 @@
+---
+title: useTask
+description: Fetch a single task by its primary key from IndexedDB via TanStack Query.
+---
+
+`useTask` is a query hook that returns a single task by its numeric primary key. It is backed by TanStack Query and keeps a separate per-id cache entry that is invalidated by `useUpdateTask` and `useDeleteTask`.
+
+## Signature
+
+```typescript queries/task.queries.ts
+export const useTask = (id: number) => UseQueryResult<Task | undefined, Error>
+```
+
+## Parameters
+
+<ParamField path="id" type="number" required>
+  The primary key of the task to fetch. Passed directly to `taskService.getTaskById(id)`.
+</ParamField>
+
+## Returns
+
+A TanStack Query `UseQueryResult` object.
+
+<ResponseField name="data" type="Task | undefined">
+  The matching task, or `undefined` if no task with the given `id` exists or if the fetch is still in progress.
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  `true` on the initial load before any data has been returned.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the query function threw an error.
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  The error object when `isError` is `true`, otherwise `null`.
+</ResponseField>
+
+## Query key
+
+```typescript
+['task', id]
+```
+
+Each `id` value gets its own cache entry, so `useTask(1)` and `useTask(2)` are cached independently.
+
+## Cache behavior
+
+The cache entry is populated by `taskService.getTaskById(id)`, which calls `db.tasks.get(id)` on the Dexie database.
+
+This per-id cache entry is invalidated whenever the following mutation hooks succeed with the matching `id`:
+
+- [`useUpdateTask`](/api/use-update-task) — invalidates `['task', id]` after a successful update
+- [`useDeleteTask`](/api/use-delete-task) — invalidates `['task', id]` after a successful deletion
+
+<Note>
+  `useTask` is defined in the query layer but is not currently consumed by any component in the UI. The `HomePage` fetches the full list via `useTasks` instead. Use `useTask` when you need to render or react to a single task in isolation, such as a detail or edit view.
+</Note>
+
+## Usage
+
+```tsx TaskDetailPage.tsx
+import { useTask } from '@/queries/task.queries';
+
+export function TaskDetailPage({ id }: { id: number }) {
+  const { data: task, isLoading, isError } = useTask(id);
+
+  if (isLoading) return <div>Loading...</div>;
+  if (isError || !task) return <div>Task not found.</div>;
+
+  return (
+    <div>
+      <h1>{task.title}</h1>
+      {task.description && <p>{task.description}</p>}
+    </div>
+  );
+}
+```

@@ -1,0 +1,85 @@
+---
+title: Task
+description: TypeScript interface representing a single task in the Daily Focus data model.
+---
+
+The `Task` interface is the core data shape used throughout Daily Focus. It is stored in IndexedDB via Dexie and returned by all query and mutation hooks.
+
+## Interface
+
+```typescript types/task.ts
+export interface Task {
+  id?: number
+  title: string
+  description?: string
+  completed: boolean
+  createdAt: number
+  category?: string
+}
+```
+
+## Fields
+
+<ResponseField name="id" type="number">
+  Auto-generated primary key. The field is optional in the TypeScript type because Dexie assigns it on insert using the `++id` schema declaration. You should omit `id` when constructing a new task and use `Omit<Task, 'id'>` for that purpose.
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  The task label displayed in the list. This is the only required human-readable field.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Optional additional detail text displayed below the title.
+</ResponseField>
+
+<ResponseField name="completed" type="boolean" required>
+  Whether the task has been marked done. Set to `false` when creating a new task.
+</ResponseField>
+
+<ResponseField name="createdAt" type="number" required>
+  Unix timestamp in milliseconds, set with `Date.now()` at creation time. Used to sort tasks newest-first.
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Optional category label available for future grouping or filtering. Not currently rendered anywhere in the UI.
+</ResponseField>
+
+## Common usage patterns
+
+### Creating a new task
+
+Use `Omit<Task, 'id'>` when constructing a task to pass to [`useAddTask`](/api/use-add-task). This enforces that you do not supply an `id` manually.
+
+```typescript
+import type { Task } from '@/types/task';
+
+const newTask: Omit<Task, 'id'> = {
+  title: 'Buy groceries',
+  completed: false,
+  createdAt: Date.now(),
+};
+
+addTask.mutate(newTask);
+```
+
+### Partial update
+
+Use `Partial<Omit<Task, 'id'>>` when passing updates to [`useUpdateTask`](/api/use-update-task). Include only the fields you want to change.
+
+```typescript
+updateTask.mutate({
+  id: task.id!,
+  updates: { completed: !task.completed },
+});
+```
+
+### Reading from the query cache
+
+The `data` field returned by [`useTasks`](/api/use-tasks) is typed as `Task[] | undefined`. Use a nullish coalescing fallback to avoid rendering issues while loading.
+
+```typescript
+import { useTasks } from '@/queries/task.queries';
+
+const tasksQuery = useTasks();
+const tasks: Task[] = tasksQuery.data ?? [];
+```

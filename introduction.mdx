@@ -1,0 +1,58 @@
+---
+title: "Introduction"
+description: "A local-first daily task manager built with React, TypeScript, Dexie, and TanStack Query."
+---
+
+# Daily Focus
+
+Daily Focus is a local-first task management app that helps you capture, complete, and review your daily tasks with a clean UI and instant data updates — no backend required.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get the app running locally in under two minutes
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/architecture/overview">
+    Understand the layered architecture and how data flows
+  </Card>
+  <Card title="TanStack Query" icon="database" href="/concepts/tanstack-query">
+    Learn how the query layer powers caching and mutations
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/use-tasks">
+    Browse the full query hooks and service API
+  </Card>
+</CardGroup>
+
+## What makes Daily Focus different
+
+Most local apps manage state with `useState` or `useReducer` directly. Daily Focus instead routes **all data access through TanStack Query**, even though the underlying store is a local IndexedDB database (via Dexie). This gives the app:
+
+- A **centralized, consistent cache** for task data across all components
+- Automatic **loading and error states** without boilerplate
+- **Query invalidation** that keeps the UI in sync after every mutation
+- Reusable **data hooks** (`useTasks`, `useAddTask`, etc.) consumed by any component
+- A clear **migration path** — replacing local Dexie calls with remote API calls requires changes only in the service layer
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| UI framework | React 19 + TypeScript |
+| Build tool | Vite |
+| Routing | React Router v7 |
+| Data orchestration | TanStack Query v5 |
+| Local persistence | Dexie v4 (IndexedDB) |
+| Styling | Tailwind CSS v4 + Radix UI primitives |
+| Linting | ESLint |
+
+## Current features
+
+- Add tasks with a title and an optional description
+- Toggle task completion with a single click
+- Delete tasks instantly
+- Filter tasks by **All**, **Completed**, or **Pending**
+- Dashboard summary cards showing total, completed, and pending counts
+- Full offline support — all data lives in the browser's IndexedDB
+
+<Note>
+  Daily Focus stores all data in your browser's IndexedDB. There is no server, no account, and no sync to the cloud. Data persists across page reloads but is scoped to the browser profile.
+</Note>

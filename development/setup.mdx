@@ -1,0 +1,68 @@
+---
+title: 'Setup'
+description: 'Get the Daily Focus project running on your local machine.'
+---
+
+## Prerequisites
+
+Before you begin, make sure you have the following installed:
+
+- **Node.js 18 or higher** — required for Vite and modern ESM features
+- **npm** — included with Node.js
+
+Verify your versions before proceeding:
+
+```bash
+node --version
+npm --version
+```
+
+## Getting started
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/R0N7w7/DailyFocus_LocalFirst.git
+    cd DailyFocus_LocalFirst
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    ```bash
+    npm install
+    ```
+
+    This installs both `dependencies` (React, Dexie, TanStack Query, etc.) and `devDependencies` (TypeScript, Vite, ESLint, etc.) defined in `package.json`.
+  </Step>
+
+  <Step title="Start the development server">
+    ```bash
+    npm run dev
+    ```
+
+    Vite starts on port **5173** by default. The `--host` flag is included in the script, which binds the server to `0.0.0.0` (all network interfaces) rather than only `localhost`. This is useful when accessing the app from another device on the same network or from inside a container.
+  </Step>
+
+  <Step title="Open in your browser">
+    Navigate to [http://localhost:5173](http://localhost:5173) to see the app running.
+  </Step>
+</Steps>
+
+## Project structure
+
+All application code lives under `src/`. Each directory has a distinct responsibility:
+
+| Directory | Role |
+|---|---|
+| `src/components/` | Reusable UI components — `Layout`, `TaskItem`, and the `ui/` primitives (Button, Card, Input, etc.) |
+| `src/pages/` | Page-level components — currently `HomePage.tsx` |
+| `src/queries/` | TanStack Query hooks for all data access (`task.queries.ts`) |
+| `src/services/` | Data access methods that wrap Dexie operations (`taskService.ts`) |
+| `src/data/` | Dexie database schema definition and initialization (`db.ts`) |
+| `src/types/` | Shared TypeScript interfaces — the `Task` type lives here |
+| `src/routes/` | React Router configuration (`AppRoutes.tsx`, `index.tsx`) |
+| `src/lib/` | Utility functions — includes the `cn` class-merging helper |
+
+<Tip>
+  The components inside `src/components/ui/` follow the [shadcn/ui](https://ui.shadcn.com/) pattern. Each primitive is a self-contained file you can extend or replace independently without affecting the rest of the app.
+</Tip>

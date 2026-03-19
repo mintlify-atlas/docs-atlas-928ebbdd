@@ -1,0 +1,116 @@
+---
+title: Dexie and IndexedDB
+description: How Daily Focus persists tasks locally using IndexedDB via the Dexie library — no server required.
+---
+
+Daily Focus stores all task data locally in the browser using **IndexedDB**, accessed through the **Dexie** wrapper library. This means tasks survive page refreshes and browser restarts without any backend or network connection.
+
+## What IndexedDB is
+
+IndexedDB is a browser-native key-value database built into every modern browser. It is:
+
+- **Persistent** — data survives page reloads and browser restarts.
+- **Local-only** — no server or network connection required.
+- **Large capacity** — storage limits are browser-dependent, but typically several hundred megabytes or more.
+- **Asynchronous** — all operations return Promises, so they never block the main thread.
+
+Dexie wraps the low-level IndexedDB API with a clean, Promise-based interface and TypeScript support.
+
+## The `DailyFocusDB` class
+
+The database is defined in `data/db.ts` by extending Dexie:
+
+```ts data/db.ts
+import type { Task } from '@/types/task'
+import Dexie, { type Table } from 'dexie'
+
+class DailyFocusDB extends Dexie {
+    tasks!: Table<Task, number>
+
+    constructor() {
+        super('DailyFocusDB')
+        this.version(1).stores({
+            tasks: '++id, title, description, completed, createdAt, category',
+        })
+    }
+}
+
+export const db = new DailyFocusDB()
+```
+
+<Steps>
+  <Step title="Extend Dexie">
+    `DailyFocusDB extends Dexie` — inheriting the Dexie connection lifecycle, transaction handling, and query API.
+  </Step>
+  <Step title="Declare the table">
+    `tasks!: Table<Task, number>` declares a typed table where each record is a `Task` and the primary key type is `number`. The `!` non-null assertion satisfies TypeScript — Dexie populates this property at runtime.
+  </Step>
+  <Step title="Name the database">
+    `super('DailyFocusDB')` sets the IndexedDB database name to `DailyFocusDB`. This is the name you will see in browser DevTools.
+  </Step>
+  <Step title="Define the schema">
+    `this.version(1).stores({ tasks: '++id, title, description, completed, createdAt, category' })` defines version 1 of the schema.
+
+    - `++id` — auto-incrementing primary key. Dexie generates this value on insert and returns it.
+    - `title, description, completed, createdAt, category` — additional indexed fields. Indexing these columns enables efficient queries and sorts on them.
+  </Step>
+</Steps>
+
+## Singleton export
+
+```ts data/db.ts
+export const db = new DailyFocusDB()
+```
+
+A single instance of `DailyFocusDB` is created and exported. Every module that imports `db` shares the same connection to the same IndexedDB database. This avoids opening multiple connections and ensures consistent state across the app.
+
+## CRUD operations via Dexie
+
+All database access goes through `TaskService` in `services/taskService.ts`. Each method maps to a single Dexie call:
+
+```ts services/taskService.ts
+import { db } from "@/data/db"
+import type { Task } from "@/types/task"
+
+class TaskService {
+    async getAllTasks(): Promise<Task[]> {
+        return db.tasks.toArray()
+    }
+    async getTaskById(id: number): Promise<Task | undefined> {
+        return db.tasks.get(id)
+    }
+    async addTask(task: Omit<Task, 'id'>): Promise<number> {
+        return db.tasks.add(task)
+    }
+    async updateTask(id: number, updates: Partial<Omit<Task, 'id'>>): Promise<number> {
+        return db.tasks.update(id, updates)
+    }
+    async deleteTask(id: number): Promise<void> {
+        return db.tasks.delete(id)
+    }
+}
+export const taskService = new TaskService()
+```
+
+| Method | Dexie call | Description |
+|---|---|---|
+| `getAllTasks()` | `db.tasks.toArray()` | Reads all records from the `tasks` store and returns them as an array |
+| `getTaskById(id)` | `db.tasks.get(id)` | Fetches a single record by primary key; returns `undefined` if not found |
+| `addTask(task)` | `db.tasks.add(task)` | Inserts a new record and returns the auto-generated numeric `id` |
+| `updateTask(id, updates)` | `db.tasks.update(id, updates)` | Partially updates the record at the given primary key; only the provided fields are changed |
+| `deleteTask(id)` | `db.tasks.delete(id)` | Removes the record with the given primary key |
+
+## Inspecting data in browser DevTools
+
+You can browse the raw IndexedDB contents at any time without extra tooling:
+
+1. Open Chrome DevTools (`F12` or `Cmd+Option+I`).
+2. Go to the **Application** tab.
+3. Expand **IndexedDB** in the left sidebar.
+4. Select **DailyFocusDB** → **tasks**.
+
+You will see every task record with all its fields. This is useful for debugging data issues or verifying that writes completed correctly.
+
+<Warning>
+  Clearing site data in the browser (DevTools → Application → Storage → Clear site data) permanently deletes the IndexedDB database and all tasks stored in it. There is no recovery.
+</Warning>

@@ -1,0 +1,46 @@
+---
+title: "Dashboard"
+description: "The three summary cards that show your total, completed, and pending task counts at a glance."
+---
+
+Above the task list, Daily Focus displays three summary cards that give you an at-a-glance view of your progress. The counts are derived directly from the full task list and update automatically whenever tasks are added, completed, or deleted.
+
+## Summary cards
+
+<CardGroup cols={3}>
+  <Card title="Total" icon="list-checks">
+    Total number of tasks across all statuses. Uses a slate color scheme.
+  </Card>
+  <Card title="Completadas" icon="check-check">
+    Number of tasks marked as complete. Uses an emerald color scheme.
+  </Card>
+  <Card title="Pendientes" icon="timer-reset">
+    Number of tasks not yet completed. Uses an amber color scheme.
+  </Card>
+</CardGroup>
+
+## How the counts are calculated
+
+All three values are computed in `HomePage` from the raw `tasks` array returned by `useTasks()`:
+
+```tsx HomePage.tsx
+const totalTasks = tasks.length;
+const totalCompleted = tasks.filter((t) => t.completed).length;
+const totalPending = totalTasks - totalCompleted;
+```
+
+- **Total** — `tasks.length`, the full count of all tasks.
+- **Completadas** — filters for tasks where `completed` is `true` and counts them.
+- **Pendientes** — derived by subtracting `totalCompleted` from `totalTasks`, so it never double-counts.
+
+## Counts reflect the full task list
+
+The dashboard counters always use `tasks` — the complete, unfiltered array — not `filteredTasks`. This means the numbers stay consistent no matter which filter tab (**Todas**, **Completadas**, or **Pendientes**) is currently active.
+
+<Note>
+  The counter data comes from the same `useTasks()` query that drives the task list, so there is no extra database call. TanStack Query serves both from the same cached result and invalidates them together whenever a mutation succeeds.
+</Note>
+
+## Automatic updates
+
+Every mutation — `useAddTask`, `useUpdateTask`, and `useDeleteTask` — invalidates the `['tasks']` query key on success. This triggers a re-fetch that refreshes both the task list and the dashboard counters simultaneously, keeping everything in sync without any manual state management.

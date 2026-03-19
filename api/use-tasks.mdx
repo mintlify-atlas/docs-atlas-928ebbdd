@@ -1,0 +1,74 @@
+---
+title: useTasks
+description: Fetch the full list of tasks from IndexedDB via TanStack Query.
+---
+
+`useTasks` is a query hook that returns all tasks stored in the local IndexedDB database. It is backed by TanStack Query and automatically re-fetches whenever the `['tasks']` cache entry is invalidated.
+
+## Signature
+
+```typescript queries/task.queries.ts
+export const useTasks = () => UseQueryResult<Task[], Error>
+```
+
+## Parameters
+
+`useTasks` takes no parameters.
+
+## Returns
+
+A TanStack Query `UseQueryResult` object.
+
+<ResponseField name="data" type="Task[] | undefined">
+  The array of all tasks. `undefined` while the first fetch is in progress.
+</ResponseField>
+
+<ResponseField name="isLoading" type="boolean">
+  `true` on the initial load before any data has been returned.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the query function threw an error.
+</ResponseField>
+
+<ResponseField name="error" type="Error | null">
+  The error object when `isError` is `true`, otherwise `null`.
+</ResponseField>
+
+## Query key
+
+```typescript
+['tasks']
+```
+
+## Cache behavior
+
+The cache entry is populated by `taskService.getAllTasks()`, which calls `db.tasks.toArray()` on the Dexie database.
+
+This cache entry is invalidated — and the query automatically re-fetches — whenever any of the following mutation hooks succeed:
+
+- [`useAddTask`](/api/use-add-task) — after a new task is inserted
+- [`useUpdateTask`](/api/use-update-task) — after a task is updated
+- [`useDeleteTask`](/api/use-delete-task) — after a task is deleted
+
+## Usage
+
+```tsx HomePage.tsx
+import { useTasks } from '@/queries/task.queries';
+
+export function HomePage() {
+  const tasksQuery = useTasks();
+  const tasks = tasksQuery.data ?? [];
+
+  if (tasksQuery.isLoading) return <div>Cargando tareas...</div>;
+  if (tasksQuery.isError) return <div>Error loading tasks.</div>;
+
+  return (
+    <ul>
+      {tasks.map((task) => (
+        <li key={task.id}>{task.title}</li>
+      ))}
+    </ul>
+  );
+}
+```

@@ -1,0 +1,72 @@
+---
+title: useDeleteTask
+description: Mutation hook to permanently remove a task from IndexedDB and invalidate related caches.
+---
+
+`useDeleteTask` is a mutation hook that permanently removes a task from the local IndexedDB database. On success it invalidates both the `['tasks']` list cache and the `['task', id]` per-item cache.
+
+## Signature
+
+```typescript queries/task.queries.ts
+export const useDeleteTask = () => UseMutationResult<void, Error, number>
+```
+
+## Parameters
+
+`useDeleteTask` itself takes no parameters. The task id is passed to the returned `mutate` function at call time.
+
+## Mutation input
+
+<ParamField path="id" type="number" required>
+  The primary key of the task to delete. Pass this value directly to `mutate(id)`.
+</ParamField>
+
+## Returns
+
+A TanStack Query `UseMutationResult` object.
+
+<ResponseField name="mutate" type="(id: number) => void">
+  Trigger the mutation. The mutation resolves with `void` — Dexie's `delete` returns no meaningful value.
+</ResponseField>
+
+<ResponseField name="isPending" type="boolean">
+  `true` while the mutation is in flight. Use this to disable the delete button.
+</ResponseField>
+
+<ResponseField name="isSuccess" type="boolean">
+  `true` after the mutation completed successfully.
+</ResponseField>
+
+<ResponseField name="isError" type="boolean">
+  `true` if the mutation threw an error.
+</ResponseField>
+
+## Cache behavior
+
+On success, `useDeleteTask` invalidates:
+
+- `['tasks']` — causes `useTasks` to re-fetch the full list without the deleted record
+- `['task', id]` — causes `useTask(id)` to re-fetch (which will return `undefined`)
+
+## Usage
+
+```tsx TaskItem.tsx
+import { useDeleteTask } from '@/queries/task.queries';
+
+export function TaskItem({ task }: { task: Task }) {
+  const deleteTask = useDeleteTask();
+
+  return (
+    <button
+      onClick={() => deleteTask.mutate(task.id!)}
+      disabled={deleteTask.isPending}
+    >
+      Delete
+    </button>
+  );
+}
+```
+
+<Warning>
+  Deletion is immediate and permanent. There is no confirmation dialog in the current implementation. Add one at the call site if your UI requires it before invoking `deleteTask.mutate(id)`.
+</Warning>

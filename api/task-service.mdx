@@ -1,0 +1,137 @@
+---
+title: TaskService
+description: The service layer that wraps Dexie IndexedDB calls for all task operations.
+---
+
+`TaskService` is the data-access class that sits between the TanStack Query hooks and the Dexie database. All database reads and writes go through this class.
+
+## Source
+
+```typescript services/taskService.ts
+import { db } from "@/data/db"
+import type { Task } from "@/types/task"
+
+class TaskService {
+    async getAllTasks(): Promise<Task[]> {
+        return db.tasks.toArray()
+    }
+
+    async getTaskById(id: number): Promise<Task | undefined> {
+        return db.tasks.get(id)
+    }
+
+    async addTask(task: Omit<Task, 'id'>): Promise<number> {
+        return db.tasks.add(task)
+    }
+
+    async updateTask(id: number, updates: Partial<Omit<Task, 'id'>>): Promise<number> {
+        return db.tasks.update(id, updates)
+    }
+
+    async deleteTask(id: number): Promise<void> {
+        return db.tasks.delete(id)
+    }
+}
+
+export const taskService = new TaskService()
+```
+
+<Note>
+  `taskService` is exported as a singleton instance. Import and use this shared instance rather than constructing your own `TaskService`. The query hooks already import and call it directly.
+</Note>
+
+## Methods
+
+### getAllTasks()
+
+Returns every task in the database with no filtering or sorting.
+
+<ResponseField name="returns" type="Promise<Task[]>">
+  Resolves with an array of all stored tasks. Returns an empty array when no tasks exist.
+</ResponseField>
+
+**Underlying call:** `db.tasks.toArray()`
+
+Used by: [`useTasks`](/api/use-tasks)
+
+---
+
+### getTaskById(id)
+
+Fetches a single task by its primary key.
+
+<ParamField path="id" type="number" required>
+  The auto-incremented primary key of the task.
+</ParamField>
+
+<ResponseField name="returns" type="Promise<Task | undefined>">
+  Resolves with the matching task, or `undefined` if no record with that `id` exists.
+</ResponseField>
+
+**Underlying call:** `db.tasks.get(id)`
+
+Used by: [`useTask`](/api/use-task)
+
+---
+
+### addTask(task)
+
+Inserts a new task record and returns the generated primary key.
+
+<ParamField path="task" type="Omit<Task, 'id'>" required>
+  The task object to insert. Do not include `id` — Dexie assigns it automatically via the `++id` primary key schema.
+</ParamField>
+
+<ResponseField name="returns" type="Promise<number>">
+  Resolves with the auto-generated `id` of the newly inserted record.
+</ResponseField>
+
+**Underlying call:** `db.tasks.add(task)`
+
+Used by: [`useAddTask`](/api/use-add-task)
+
+---
+
+### updateTask(id, updates)
+
+Applies a partial update to an existing task record.
+
+<ParamField path="id" type="number" required>
+  The primary key of the task to update.
+</ParamField>
+
+<ParamField path="updates" type="Partial<Omit<Task, 'id'>>" required>
+  A partial object with the fields to change. Only the provided fields are overwritten; all other fields remain unchanged.
+</ParamField>
+
+<ResponseField name="returns" type="Promise<number>">
+  Resolves with `1` if a record was found and updated, or `0` if no record with the given `id` exists.
+</ResponseField>
+
+**Underlying call:** `db.tasks.update(id, updates)`
+
+Used by: [`useUpdateTask`](/api/use-update-task)
+
+---
+
+### deleteTask(id)
+
+Permanently removes a task record from the database.
+
+<ParamField path="id" type="number" required>
+  The primary key of the task to delete.
+</ParamField>
+
+<ResponseField name="returns" type="Promise<void>">
+  Resolves with no value after the record has been removed. Dexie does not throw if the `id` does not exist.
+</ResponseField>
+
+**Underlying call:** `db.tasks.delete(id)`
+
+Used by: [`useDeleteTask`](/api/use-delete-task)
+
+---
+
+<Tip>
+  To migrate from IndexedDB to a REST API, replace each method body with the equivalent `fetch` call while keeping the same signatures. The query hooks and the rest of the UI will continue to work without any changes because they only depend on the `taskService` interface, not on Dexie directly.
+</Tip>

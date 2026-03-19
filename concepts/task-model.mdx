@@ -1,0 +1,72 @@
+---
+title: Task model
+description: The Task interface that flows through every layer of Daily Focus — from the database schema to the UI.
+---
+
+Every piece of data in Daily Focus centers on a single `Task` interface defined in `types/task.ts`. The same type is used in the database schema, the service layer, the TanStack Query hooks, and the React components.
+
+## The `Task` interface
+
+```ts types/task.ts
+export interface Task {
+  id?: number
+  title: string
+  description?: string
+  completed: boolean
+  createdAt: number
+  category?: string
+}
+```
+
+## Field reference
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `number` | No (auto-generated) | Auto-incremented primary key assigned by Dexie/IndexedDB on insert |
+| `title` | `string` | Yes | The task's main label, shown as the primary text in the task list |
+| `description` | `string` | No | Optional detail text displayed below the title |
+| `completed` | `boolean` | Yes | Whether the task has been marked as complete |
+| `createdAt` | `number` | Yes | Unix timestamp in milliseconds from `Date.now()`, used to sort tasks newest-first |
+| `category` | `string` | No | Optional tag for grouping tasks — present in the schema but not currently rendered in the UI |
+
+## Constructing a new task
+
+When a user submits the task form in `HomePage`, a new task object is built before being passed to `useAddTask().mutate()`:
+
+```tsx
+const newTask: Omit<Task, "id"> = {
+    title: title.trim(),
+    description: description.trim(),
+    completed: false,
+    createdAt: Date.now(),
+};
+```
+
+`id` is excluded from this object using the `Omit<Task, "id">` utility type. Dexie generates the `id` automatically via the `++id` schema definition and returns the new value from `db.tasks.add()`. Attempting to supply your own `id` on insert would conflict with the auto-increment sequence.
+
+`createdAt` is set to `Date.now()` at the moment of creation, giving a millisecond-precision Unix timestamp that the UI uses to sort the task list with the newest task at the top.
+
+## How the type flows through the app
+
+<Steps>
+  <Step title="Database schema">
+    `data/db.ts` declares `tasks!: Table<Task, number>` — the `Task` interface defines the shape of every record in IndexedDB, and `number` is the primary key type.
+  </Step>
+  <Step title="Service layer">
+    `services/taskService.ts` uses `Task` in every method signature. `addTask` accepts `Omit<Task, 'id'>` to enforce that callers never supply an `id` on creation. `updateTask` accepts `Partial<Omit<Task, 'id'>>` to allow partial updates.
+  </Step>
+  <Step title="Query hooks">
+    `queries/task.queries.ts` infers return types from the service calls. `useTasks()` returns `UseQueryResult<Task[]>` and `useTask(id)` returns `UseQueryResult<Task | undefined>`, so components get full type safety on `tasksQuery.data`.
+  </Step>
+  <Step title="Components">
+    `HomePage` and `TaskItem` consume `Task` objects directly from `tasksQuery.data`. Mutation hooks (`useUpdateTask`, `useDeleteTask`) accept typed arguments derived from `Task`, so TypeScript catches mismatches at compile time.
+  </Step>
+</Steps>
+
+## The `category` field
+
+`category` is defined as an optional string and is indexed in the Dexie schema (`++id, title, description, completed, createdAt, category`), which means it can be queried and filtered efficiently. However, it is not currently rendered anywhere in the UI. The field exists as an extension point for future features such as category filtering or grouped task views.
+
+<Note>
+  If you add category display or filtering to the UI, no database migration is needed — the field is already indexed and populated on any task that has it set.
+</Note>
